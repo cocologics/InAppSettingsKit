@@ -45,7 +45,7 @@ static NSString *kIASKCredits = @"Powered by InAppSettingsKit"; // Leave this as
 
 CGRect IASKCGRectSwap(CGRect rect);
 
-@interface IASKAppSettingsViewController () <UITextViewDelegate>
+@interface IASKAppSettingsViewController () <IASKSettingsReaderDelegate, UITextViewDelegate>
 
 @property (nonatomic, weak) UIViewController *currentChildViewController;
 @property (nonatomic, strong) NSMutableDictionary *rowHeights;
@@ -66,11 +66,13 @@ CGRect IASKCGRectSwap(CGRect rect);
 @synthesize childPaneHandler = _childPaneHandler;
 @synthesize currentFirstResponder = _currentFirstResponder;
 @synthesize listParentViewController;
+@synthesize colorScheme = _colorScheme;
 
 #pragma mark accessors
 - (IASKSettingsReader*)settingsReader {
 	if (!_settingsReader) {
-		_settingsReader = [[IASKSettingsReader alloc] initWithFile:self.file];
+		NSBundle* bundle = _bundle == nil ? NSBundle.mainBundle : _bundle;
+		_settingsReader = [[IASKSettingsReader alloc] initWithFile:self.file bundle:bundle delegate:self];
 		if (self.neverShowPrivacySettings) {
 			_settingsReader.showPrivacySettings = NO;
 		}
@@ -110,14 +112,26 @@ CGRect IASKCGRectSwap(CGRect rect);
     self.tableView.contentOffset = CGPointMake(0, -self.tableView.contentInset.top);
     self.settingsReader = nil; // automatically initializes itself
     if (!_reloadDisabled) {
-		[self.tableView reloadData];
 		[self createSelections];
+		[self.tableView reloadData];
+	}
+}
+
+- (UIColor*)detailTextColor {
+	if (self.colorScheme == IASKColorSchemeSystem) {
+		if (@available(iOS 13.0, *)) {
+			return UIColor.secondaryLabelColor;
+		} else {
+			return [UIColor colorWithRed:0.235294 green:0.235294 blue:0.262745 alpha:0.6];
+		}
+	} else {
+		return self.tintColor;
 	}
 }
 
 - (void)createSelections {
 	NSMutableArray *sectionSelection = [NSMutableArray new];
-	for (int section = 0; section < _settingsReader.numberOfSections; section++) {
+	for (int section = 0; section < self.settingsReader.numberOfSections; section++) {
 		IASKSpecifier *specifier = [self.settingsReader headerSpecifierForSection:section];
 		if ([specifier.type isEqualToString:kIASKPSRadioGroupSpecifier]) {
 			IASKMultipleValueSelection *selection = [[IASKMultipleValueSelection alloc] initWithSettingsStore:self.settingsStore tableView:self.tableView specifier:specifier section:section];
@@ -367,6 +381,7 @@ CGRect IASKCGRectSwap(CGRect rect);
 			}
 		} else {
 			self.settingsReader.hiddenKeys = theHiddenKeys;
+			[self createSelections];
 			if (!_reloadDisabled) [self.tableView reloadData];
 		}
 	}
@@ -599,7 +614,7 @@ CGRect IASKCGRectSwap(CGRect rect);
 }
 
 - (UITableViewCell *)tableView:(UITableView *)tableView cellForRowAtIndexPath:(NSIndexPath *)indexPath {
-	IASKSpecifier *specifier  = [self.settingsReader specifierForIndexPath:indexPath];
+	IASKSpecifier *specifier = [self.settingsReader specifierForIndexPath:indexPath];
 	if ([specifier.type isEqualToString:kIASKCustomViewSpecifier] && [self.delegate respondsToSelector:@selector(settingsViewController:cellForSpecifier:)]) {
 		UITableViewCell* cell = [self.delegate settingsViewController:self cellForSpecifier:specifier];
 		assert(nil != cell && "delegate must return a UITableViewCell for custom cell types");
@@ -607,6 +622,10 @@ CGRect IASKCGRectSwap(CGRect rect);
 	}
 	
 	UITableViewCell* cell = [self tableView:tableView newCellForSpecifier:specifier];
+	cell.textLabel.textColor = (specifier.isAddSpecifier || specifier.textAlignment == NSTextAlignmentCenter) ? self.tintColor : [UILabel appearanceWhenContainedInInstancesOfClasses:@[UITableViewCell.class]].textColor;
+	if (![specifier.type isEqualToString:kIASKPSSliderSpecifier]) {
+		cell.imageView.image = specifier.cellImage;
+	}
 	id currentValue = [self.settingsStore objectForSpecifier:specifier];
 	NSString *title = specifier.title;
 	
@@ -643,16 +662,21 @@ CGRect IASKCGRectSwap(CGRect rect);
 
 		BOOL hasTitle = title.length > 0 && !specifier.isItemSpecifier;
 		cell.detailTextLabel.text = [[specifier titleForCurrentValue:currentValue ?: specifier.defaultValue] description];
+		cell.detailTextLabel.textColor = self.detailTextColor;
 		if (hasTitle) {
 			cell.textLabel.text = title;
 		} else {
 			cell.textLabel.text = cell.detailTextLabel.text;
 			cell.detailTextLabel.text = nil;
+
+			if (!specifier.parentSpecifier && self.colorScheme == IASKColorSchemeTinted) {
+				cell.textLabel.textColor = self.tintColor;
+			}
 		}
 	}
 	else if (specifier.embeddedDatePicker) {
 		IASKEmbeddedDatePickerViewCell *datePickerCell = (id)cell;
-		datePickerCell.titleLabel.text = title;
+		datePickerCell.textLabel.text = title;
 		datePickerCell.datePicker.specifier = specifier;
 		datePickerCell.datePicker.datePickerMode = specifier.datePickerMode;
 		if (@available(iOS 14.0, *)) {
@@ -664,6 +688,7 @@ CGRect IASKCGRectSwap(CGRect rect);
 		} else {
 			datePickerCell.datePicker.date = currentValue ?: NSDate.date;
 		}
+		datePickerCell.selectionStyle = UITableViewCellSelectionStyleNone;
 	}
 	else if ([@[kIASKPSTitleValueSpecifier, kIASKDatePickerSpecifier] containsObject:specifier.type]) {
 		cell.textLabel.text = title;
@@ -686,7 +711,10 @@ CGRect IASKCGRectSwap(CGRect rect);
 		}
 		cell.userInteractionEnabled = [specifier.type isEqualToString:kIASKDatePickerSpecifier];
 		if ([specifier.type isEqualToString:kIASKDatePickerSpecifier]) {
-			cell.detailTextLabel.textColor = [specifier isEqual:self.settingsReader.selectedSpecifier] ? [UILabel appearanceWhenContainedInInstancesOfClasses:@[UITableViewCell.class]].textColor : self.tintColor;
+			cell.detailTextLabel.textColor = self.detailTextColor;
+			if ([specifier isEqual:self.settingsReader.selectedSpecifier]) {
+				cell.detailTextLabel.textColor = [UILabel appearanceWhenContainedInInstancesOfClasses:@[UITableViewCell.class]].textColor;
+			}
 		}
 	}
 	else if ([specifier.type isEqualToString:kIASKPSTextFieldSpecifier]) {
@@ -754,6 +782,7 @@ CGRect IASKCGRectSwap(CGRect rect);
 					cell.textLabel.text = [self.settingsReader titleForId:valueString];
 				} else {
 					cell.detailTextLabel.text = [self.settingsReader titleForId:valueString];
+					cell.detailTextLabel.textColor = self.detailTextColor;
 				}
 			}
 		}
@@ -765,7 +794,7 @@ CGRect IASKCGRectSwap(CGRect rect);
 		cell.textLabel.text = ([currentValue isKindOfClass:NSString.class] && [self.settingsReader titleForId:currentValue].length) ? [self.settingsReader titleForId:currentValue] : title;
 		cell.detailTextLabel.text = [specifier subtitleForValue:currentValue];
 		cell.textLabel.textAlignment = specifier.textAlignment;
-		cell.accessoryType = (specifier.textAlignment == NSTextAlignmentLeft) ? UITableViewCellAccessoryDisclosureIndicator : UITableViewCellAccessoryNone;
+		cell.accessoryType = (specifier.textAlignment == NSTextAlignmentNatural || specifier.textAlignment == NSTextAlignmentLeft) ? UITableViewCellAccessoryDisclosureIndicator : UITableViewCellAccessoryNone;
 	} else if ([specifier.type isEqualToString:kIASKPSRadioGroupSpecifier]) {
 		NSInteger index = [specifier.multipleValues indexOfObject:(id)specifier.radioGroupValue];
 		cell.textLabel.text = [self.settingsReader titleForId:specifier.multipleTitles[index]];
@@ -796,7 +825,6 @@ CGRect IASKCGRectSwap(CGRect rect);
 	cell.detailTextLabel.textAlignment = specifier.textAlignment;
 	cell.textLabel.adjustsFontSizeToFitWidth = specifier.adjustsFontSizeToFitWidth;
 	cell.detailTextLabel.adjustsFontSizeToFitWidth = specifier.adjustsFontSizeToFitWidth;
-	cell.textLabel.textColor = (specifier.isAddSpecifier || specifier.textAlignment == NSTextAlignmentCenter) ? self.tintColor : [UILabel appearanceWhenContainedInInstancesOfClasses:@[UITableViewCell.class]].textColor;
 	return cell;
 }
 
@@ -881,7 +909,7 @@ CGRect IASKCGRectSwap(CGRect rect);
             UIViewController * vc = [vcClass alloc];
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
-			vc = [vc performSelector:initSelector withObject:specifier.file withObject:specifier];
+			vc = [vc performSelector:initSelector withObject:[specifier localizedObjectForKey:kIASKFile] withObject:specifier];
 #pragma clang diagnostic pop
             if ([vc respondsToSelector:@selector(setDelegate:)]) {
                 [vc performSelector:@selector(setDelegate:) withObject:self.delegate];
@@ -897,13 +925,31 @@ CGRect IASKCGRectSwap(CGRect rect);
 			
 		NSString *segueIdentifier = specifier.segueIdentifier;
         if (segueIdentifier) {
-			@try {
-				[self performSegueWithIdentifier:segueIdentifier sender:self];
-			} @catch (NSException *exception) {
-				NSLog(@"segue with identifier '%@' not defined", segueIdentifier);
-				[tableView deselectRowAtIndexPath:indexPath animated:YES];
-			}
-			[tableView endUpdates];
+            @try {
+                [self performSegueWithIdentifier:segueIdentifier sender:self];
+                
+                // The segue's view controller will be presented modally. Hence any delegate methods on this class, like `viewWillDisappear:` and `viewWillAppear:`, will not be called when that view controller is presented and dismissed. In order to deselect the row upon dismissal, we use a repeating timer that checks whether the presented view controller gets dismissed.
+                NSTimer *checkSegueDismissedTimer = [NSTimer timerWithTimeInterval:0.1
+                                                                           repeats:YES
+                                                                             block:^(NSTimer * _Nonnull timer) {
+                    // When the presented view controller is dismissed:
+                    if (self.presentedViewController == nil) {
+                        [self.tableView deselectRowAtIndexPath:indexPath animated:YES];
+                        
+                        if ([timer isValid]) {
+							[timer invalidate]; // Stop timer
+                        }
+                    }
+                }];
+                
+                // Add timer to the Main runloop:
+                [[NSRunLoop mainRunLoop] addTimer:checkSegueDismissedTimer
+                                          forMode:NSRunLoopCommonModes];
+            } @catch (NSException *exception) {
+                NSLog(@"segue with identifier '%@' not defined", segueIdentifier);
+                [tableView deselectRowAtIndexPath:indexPath animated:YES];
+            }
+            [tableView endUpdates];
             return;
         }
         
@@ -918,6 +964,7 @@ CGRect IASKCGRectSwap(CGRect rect);
             [((IASKAppSettingsViewController*)[[self class] alloc]) initWithStyle:self.tableView.style];
         targetViewController.showDoneButton = NO;
         targetViewController.showCreditsFooter = NO; // Does not reload the tableview (but next setters do it)
+        targetViewController.bundle = self.bundle;
         targetViewController.delegate = self.delegate;
         targetViewController.file = (id)specifier.file;
         targetViewController.hiddenKeys = self.hiddenKeys;
@@ -936,8 +983,7 @@ CGRect IASKCGRectSwap(CGRect rect);
 		NSString *urlString = [specifier localizedObjectForKey:kIASKFile];
 		NSURL *url = urlString ? [NSURL URLWithString:urlString] : nil;
 		if (url) {
-			IASK_IF_IOS11_OR_GREATER([UIApplication.sharedApplication openURL:url options:@{} completionHandler:nil];);
-			IASK_IF_PRE_IOS11([UIApplication.sharedApplication openURL:url];);
+			[UIApplication.sharedApplication openURL:url options:@{} completionHandler:nil];
 		}
 	} else if ([specifier.type isEqualToString:kIASKButtonSpecifier]) {
         if ([self.delegate respondsToSelector:@selector(settingsViewController:buttonTappedForSpecifier:)]) {
@@ -978,11 +1024,11 @@ CGRect IASKCGRectSwap(CGRect rect);
 		if ([MFMailComposeViewController canSendMail]) {
 			mailViewController.mailComposeDelegate = self;
             _currentChildViewController = mailViewController;
-#if !TARGET_OS_MACCATALYST
+#if !TARGET_OS_MACCATALYST && (!defined(TARGET_OS_VISION) || !TARGET_OS_VISION)
             UIStatusBarStyle savedStatusBarStyle = [UIApplication sharedApplication].statusBarStyle;
 #endif
             [self presentViewController:mailViewController animated:YES completion:^{
-#if !TARGET_OS_MACCATALYST
+#if !TARGET_OS_MACCATALYST && (!defined(TARGET_OS_VISION) || !TARGET_OS_VISION)
 			    [UIApplication sharedApplication].statusBarStyle = savedStatusBarStyle;
 #endif
             }];
@@ -1038,6 +1084,7 @@ CGRect IASKCGRectSwap(CGRect rect);
 	targetViewController.tableView.cellLayoutMarginsFollowReadableWidth = self.cellLayoutMarginsFollowReadableWidth;
 	_currentChildViewController = targetViewController;
 	targetViewController.settingsStore = self.settingsStore;
+	targetViewController.colorScheme = self.colorScheme;
 	targetViewController.view.tintColor = self.tintColor;
 	if ([specifier.parentSpecifier.type isEqualToString:kIASKListGroupSpecifier]) {
 		NSDictionary *itemDict = @{};
@@ -1089,6 +1136,31 @@ CGRect IASKCGRectSwap(CGRect rect);
 		self.childPaneHandler(NO); // perform initial validation
 	} else {
 		[[self navigationController] pushViewController:targetViewController animated:YES];
+	}
+}
+
+#pragma mark -
+#pragma mark IASKSettingsReaderDelegate
+- (nullable NSArray<NSString*>*)titlesForSpecifier:(IASKSpecifier*)specifier {
+	if ([self.delegate respondsToSelector:@selector(settingsViewController:titlesForSpecifier:)]) {
+		return [self.delegate settingsViewController:self titlesForSpecifier:specifier];
+	}
+	return nil;
+}
+
+- (NSArray*)valuesForSpecifier:(IASKSpecifier*)specifier {
+	if ([self.delegate respondsToSelector:@selector(settingsViewController:valuesForSpecifier:)]) {
+		return [self.delegate settingsViewController:self valuesForSpecifier:specifier];
+	}
+	return nil;
+}
+
+- (void)setMultiValuesFromDelegateIfNeeded:(IASKSpecifier *)specifier {
+	if (specifier.multipleValues.count == 0) {
+		NSArray *titles = [self titlesForSpecifier:specifier];
+		NSArray *values = [self valuesForSpecifier:specifier];
+		[specifier setMultipleValuesDictValues:values titles:titles];
+		[specifier sortIfNeeded];
 	}
 }
 
@@ -1156,6 +1228,9 @@ CGRect IASKCGRectSwap(CGRect rect);
 	};
 	
 	switch (result) {
+		case IASKValidationResultOkWithReplacement:
+			restoreText();
+			// fallthrough
 		case IASKValidationResultOk: {
 			if (![self.settingsStore objectForSpecifier:specifier] && textField.text.length == 0) {
 				return;
@@ -1294,18 +1369,6 @@ static NSMutableDictionary *oldUserDefaults = nil;
 - (void)reload {
 	// wait 0.5 sec until UI is available after applicationWillEnterForeground
 	[self.tableView performSelector:@selector(reloadData) withObject:nil afterDelay:0.5];
-}
-
-- (void)setMultiValuesFromDelegateIfNeeded:(IASKSpecifier *)specifier {
-	if (specifier.multipleValues.count == 0) {
-		if ([self.delegate respondsToSelector:@selector(settingsViewController:valuesForSpecifier:)] &&
-			[self.delegate respondsToSelector:@selector(settingsViewController:titlesForSpecifier:)])
-		{
-			[specifier setMultipleValuesDictValues:[self.delegate settingsViewController:self valuesForSpecifier:specifier]
-											titles:[self.delegate settingsViewController:self titlesForSpecifier:specifier]];
-		}
-		[specifier sortIfNeeded];
-	}
 }
 
 

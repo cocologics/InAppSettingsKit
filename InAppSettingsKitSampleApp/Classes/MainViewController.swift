@@ -38,6 +38,7 @@ class MainViewController: UIViewController {
 		{
 			settingsVC.delegate = self
 			settingsVC.showDoneButton = segue.identifier == "modal"
+			settingsVC.colorScheme = .tinted
 			settingsViewController = settingsVC
 		} else if let settingsVC = segue.destination as? IASKAppSettingsViewController{
 			settingsVC.delegate = self
@@ -91,6 +92,22 @@ extension MainViewController: IASKSettingsDelegate {
 			}
 			textField.textColor = .red
 			return .failed
+		} else if key == "account_name", let value = textField.text {
+			let regex = "^@?[\\w](?!.*?\\.{2})[\\w.]{1,28}[\\w]$"
+			if value.isEmpty {
+				return .okWithReplacement
+			} else if value == "@" {
+				replacement?.pointee = "" as NSString
+				return .failed
+			} else if value.range(of: regex, options: .regularExpression) == nil {
+				if let previousValue {
+					replacement?.pointee = previousValue as NSString
+					return .failedWithShake
+				}
+			} else if !value.hasPrefix("@") {
+				replacement?.pointee = "@\(value)" as NSString
+				return .okWithReplacement
+			}
 		}
 		return .ok
 	}
@@ -193,14 +210,14 @@ extension MainViewController: IASKSettingsDelegate {
 	}
 	
 	func settingsViewController(_ settingsViewController: IASKAppSettingsViewController, valuesFor specifier: IASKSpecifier) -> [Any] {
-		return specifier.key == "countryCode" ? Locale.isoRegionCodes : []
+		return specifier.key == "countryCode" ? Locale.isoRegionCodes : ["Chicago", "Seattle", "Miami"]
 	}
 	
-	func settingsViewController(_ settingsViewController: IASKAppSettingsViewController, titlesFor specifier: IASKSpecifier) -> [Any] {
+	func settingsViewController(_ settingsViewController: IASKAppSettingsViewController, titlesFor specifier: IASKSpecifier) -> [String] {
 		if specifier.key == "countryCode" {
 			return Locale.isoRegionCodes.map{Locale.current.localizedString(forRegionCode: $0) ?? ""}
 		}
-		return []
+		return ["Chicago", "Seattle", "Miami"]
 	}
 	
 	func settingsViewController(_ settingsViewController: IASKAppSettingsViewController, childPaneIsValidFor specifier: IASKSpecifier, contentDictionary: NSMutableDictionary) -> Bool {

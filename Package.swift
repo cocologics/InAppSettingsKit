@@ -1,10 +1,10 @@
-// swift-tools-version:5.3
+// swift-tools-version:5.7
 import PackageDescription
 
 let package = Package(
     name: "InAppSettingsKit",
     defaultLocalization: "en",
-    platforms: [.iOS(.v9)],
+	platforms: [.iOS("10.0"), .macCatalyst("13.0")],
     products: [
         .library(
             name: "InAppSettingsKit",
@@ -13,7 +13,14 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "InAppSettingsKit"
+            name: "InAppSettingsKit",
+			exclude: [
+				"README.md",
+				"IASK.gif",
+				"InAppSettingsKit.podspec",
+				"RELEASE_NOTES.md",
+			],
+			resources: [.copy("PrivacyInfo.xcprivacy")]
         ),
         .testTarget(
             name: "InAppSettingsKitTests",
@@ -24,6 +31,5 @@ let package = Package(
                 .copy("Settings.bundle")
             ]
         ),
-
     ]
 )

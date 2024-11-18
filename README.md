@@ -5,11 +5,11 @@
 [![Swift Package Manager compatible](https://img.shields.io/badge/SPM-compatible-brightgreen.svg)](https://swiftpackageindex.com/futuretap/InAppSettingsKit)
 [![Carthage compatible](https://img.shields.io/badge/Carthage-compatible-4BC51D.svg?style=flat)](https://github.com/Carthage/Carthage)
 [![License](https://img.shields.io/cocoapods/l/InAppSettingsKit.svg?style=flat)](https://github.com/futuretap/InAppSettingsKit/blob/master/LICENSE)
-![Platform](https://img.shields.io/badge/Platforms-iOS%20|%20macOS%20Catalyst-lightgrey.svg)
+![Platform](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Ffuturetap%2FInAppSettingsKit%2Fbadge%3Ftype%3Dplatforms)
 [![Sponsor](https://img.shields.io/badge/Sponsor-ff40a0)](https://github.com/sponsors/futuretap)
-[![Twitter](https://img.shields.io/twitter/follow/ortwingentz.svg?style=social&label=Follow)](https://twitter.com/ortwingentz)
+[![Mastodon](https://img.shields.io/mastodon/follow/000010558?domain=https%3A%2F%2Fmastodon.cloud)](https://mastodon.cloud/@ortwingentz)
 
-InAppSettingsKit (IASK) is an open source framework to easily add in-app settings to your iOS or Catalyst apps. Normally iOS apps use the `Settings.bundle` resource to add app-specific settings in the Settings app. InAppSettingsKit takes advantage of the same bundle and allows you to present the same settings screen within your app. So the user has the choice where to change the settings.
+InAppSettingsKit (IASK) is an open source framework to easily add in-app settings to your iOS, Catalyst, or visionOS apps. Normally iOS apps use the `Settings.bundle` resource to add app-specific settings in the Settings app. InAppSettingsKit takes advantage of the same bundle and allows you to present the same settings screen within your app. So the user has the choice where to change the settings.
 
 IASK not only replicates the feature set of system settings but supports a large number of additional elements and configuration options.
 
@@ -19,11 +19,13 @@ IASK not only replicates the feature set of system settings but supports a large
 
 - [How does it work?](#how-does-it-work)
 - [How to include it?](#how-to-include-it)
+- [Sample application](#sample-application)
 - [App Integration](#app-integration)
 - [Goodies](#goodies)
 	- [Custom inApp plists](#custom-inapp-plists)
 	- [Privacy link](#privacy-link)
 	- [Open URL](#open-url)
+    - [Web View Controller](#web-view-controller)
 	- [Mail Composer](#mail-composer)
 	- [Button](#button)
 	- [Multiline Text View](#multiline-text-view)
@@ -44,7 +46,7 @@ IASK not only replicates the feature set of system settings but supports a large
 - [Support](#support)
 - [License](#license)
 - [Author](#author)
-    
+
 
 # How does it work?
 
@@ -57,11 +59,11 @@ The source code is available on [github](http://github.com/futuretap/InAppSettin
 
 **Using SPM**
 
-Add to your Package.swift
+To install InAppSettingsKit using [Swift Package Manager](https://github.com/apple/swift-package-manager) you can follow the [tutorial published by Apple](https://developer.apple.com/documentation/xcode/adding_package_dependencies_to_your_app) using the URL for the InAppSettingsKit repo with the current version:
 
-    .package(name: "InAppSettingsKit", url: "https://github.com/futuretap/InAppSettingsKit.git", .branch("master"))
+1. In Xcode, select “File” → “Add Packages…”
+1. Enter `https://github.com/futuretap/InAppSettingsKit.git`
 
-Alternatively go to Xcodes `File->Swift Packages->Add Package Dependency...` menu entry and add `https://github.com/futuretap/InAppSettingsKit.git`.
 
 **Using CocoaPods**
 
@@ -69,11 +71,25 @@ Add to your `Podfile`:
 
     pod 'InAppSettingsKit'
 
+Then run `pod install`.
+
 **Using Carthage**
 
 Add to your `Cartfile`:
 
     github "futuretap/InAppSettingsKit" "master"
+
+
+# Sample application
+
+InAppSettingsKit contains an Xcode sample application, that demonstrates all of it's extensive features. Both for a push and modal view controller.  
+To run the sample application:
+
+1. From the project root folder, open `InAppSettingsKit.xcworkspace` in Xcode.
+2. Change the scheme to `Sample App` (Product > Scheme > Sample App).
+3. Select a destination, like an iPhone Simulator.
+4. To build and run the application, choose Product > Run, or click the Run button in the Xcode toolbar.
+
 
 # App Integration
 
@@ -82,12 +98,54 @@ In order to start using IASK add `Settings.bundle` to your project (`File` -> `A
 To display InAppSettingsKit, instantiate `IASKAppSettingsViewController` and push it onto the navigation stack or embed it as the root view controller of a navigation controller.
 
 **In code, using Swift:**
+
 ```swift
 let appSettingsViewController = IASKAppSettingsViewController()
 navigationController.pushViewController(appSettingsViewController, animated: true)
 ```
 
+**In code, using Swift as part of a swift package:**
+
+In a modularized app, you might want to move all settings-related code into a separate package, and only reference the InAppSettingsKit dependency there. Your `Package.swift` would look like this:
+
+```swift
+let package = Package(
+    name: "SettingsPackage",
+    platforms: [.iOS(.v17)],
+    dependencies: [
+        .package(url: "https://github.com/futuretap/inappsettingskit", from: "3.4.0")
+    ],
+    .target(
+        name: "SettingsPackage",
+        dependencies: [
+            .product(name: "InAppSettingsKit", package: "inappsettingskit"),
+        ],
+        resources: [
+            .copy("InAppSettings.bundle")
+        ]
+    )
+)
+```
+
+(Note that the `InAppSettings.bundle` directory is also part of the package, and does not belong to the main app anymore.)
+
+Creating an `IASKAppSettingsViewController` now requires setting its `bundle` property to the package's bundle:
+
+```swift
+struct InAppSettingsView: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> some UIViewController {
+        let iask = IASKAppSettingsViewController(style: .insetGrouped)
+        iask.bundle = Bundle.module // IMPORTANT
+        return iask
+    }
+
+    func updateUIViewController(_ uiViewController: UIViewControllerType, context: Context) { }
+}
+
+```
+
 **In code, using Objective-C:**
+
 ```objc
 IASKAppSettingsViewController *appSettingsViewController = [[IASKAppSettingsViewController alloc] init];
 [self.navigationController pushViewController:appSettingsViewController animated:YES];
@@ -103,7 +161,7 @@ IASKAppSettingsViewController *appSettingsViewController = [[IASKAppSettingsView
 	- Set the delegate comforming to `IASKAppSettingsViewControllerDelegate`.
 	- Implement the delegate method `-settingsViewControllerDidEnd:` and dismiss the view controller.
 
-The sample application shows how to wire everything up.
+The [sample application](#sample-application) shows how to wire everything up.
 
 **Additional changes**
 
@@ -138,11 +196,40 @@ If the app includes a usage key for various privacy features such as camera or l
 
 If you don't want to show Privacy cells, set the property `neverShowPrivacySettings` to `YES`.
 
-The sample app defines `NSMicrophoneUsageDescription` to let the cell appear. Note that the settings page doesn't show any privacy settings yet because the app doesn't actually access the microphone. Privacy settings only show up in the Settings app after first use of the privacy-protected API.
+The [sample application](#sample-application) defines `NSMicrophoneUsageDescription` to let the cell appear. Note that the settings page doesn't show any privacy settings yet because the app doesn't actually access the microphone. Privacy settings only show up in the Settings app after first use of the privacy-protected API.
 
+
+## Color schemes
+You can specify `tintColor` by setting it on the view of your IASKAppSettingsViewController instance. The tint color is used for buttons and centered text (see below for both). Optionally, you can specify `settingsViewController.colorScheme = IASKColorSchemeTinted` to use tintColor for all user-editable options such as multi value elements.
 
 ## Open URL
 InAppSettingsKit adds a new element `IASKOpenURLSpecifier` that allows to open a specified URL using an external application (i.e. Safari or Mail). The URL to launch is specified in the `File` parameter. See the sample `Root.inApp.plist` for details.
+
+
+## Web View Controller
+To open a specified URL inside your application, `IASKAppSettingsWebViewController` displays a fullscreen View Controller with an embedded [`WKWebView`](https://developer.apple.com/documentation/webkit/wkwebview).  
+By default it shows an indeterminate activity indicator on the right side of the navigation bar when a page is loading.
+
+The Web View Controller can be defined in the Settings plist by using the following mandatory properties:
+
+- `Type`: set to `PSChildPaneSpecifier`
+- `IASKViewControllerClass`: set to `IASKAppSettingsWebViewController`
+- `IASKViewControllerSelector`: set to `initWithFile:specifier:`
+- `Title`: the localized title of the row
+- `File`: corresponds to the URL you want to load (e.g. "https://www.futuretap.com")
+
+Use the following optional properties to customize the Web View Controller:
+
+- `IASKWebViewShowProgress`: set to `YES` to replace the default activity indicator on the navigation bar by a progress bar just below the navigation bar, which dynamically updates according to the [`estimatedProgress`](https://developer.apple.com/documentation/webkit/wkwebview/1415007-estimatedprogress) property of [`WKWebView`](https://developer.apple.com/documentation/webkit/wkwebview).   
+The progress bar will be removed when page loading completes.
+- `IASKWebViewShowNavigationalButtons`: set to `YES` to show navigational buttons on the right side of the navigation bar. Their enabled state will update dynamically based on the navigation history of the [`WKWebView`](https://developer.apple.com/documentation/webkit/wkwebview).
+- `IASKWebViewHideBottomBar`: set to `YES` to hide the tab bar at the bottom of the screen when the `IASKAppSettingsWebViewController` is pushed on to a navigation controller. This will present the [`WKWebView`](https://developer.apple.com/documentation/webkit/wkwebview) full screen and prevents situations where the user can navigate the tab bar while the `IASKAppSettingsWebViewController` stays still present.  
+This setting is ignored when `IASKAppSettingsWebViewController` is presented modally.
+
+For more details, open the [Sample application](#sample-application) and take a look at all rows that start with **WebView**.
+
+Although `IASKAppSettingsWebViewController` might look similar to [`SFSafariViewController`](https://developer.apple.com/documentation/safariservices/sfsafariviewcontroller), the big difference is that `IASKAppSettingsWebViewController` does not reveal the URL to the user, nor can it be opened in an external browser (i.e. Safari or Chrome).  
+In other words, it keeps your source private.
 
 
 ## Mail Composer
@@ -163,7 +250,7 @@ InAppSettingsKit adds a `IASKButtonSpecifier` element that allows to call a cust
 
     - (void)settingsViewController:(IASKAppSettingsViewController*)sender buttonTappedForSpecifier:(IASKSpecifier*)specifier;
 
-The sender is always an instance of `IASKAppSettingsViewController`, a `UIViewController` subclass. So you can access its view property (might be handy to display an action sheet) or push another view controller. Another nifty feature is that the title of IASK buttons can be overriden by the (localizable) value from `NSUserDefaults` (or any other settings store - see below). This comes in handy for toggle buttons (e.g. Login/Logout). See the sample app for details.
+The sender is always an instance of `IASKAppSettingsViewController`, a `UIViewController` subclass. So you can access its view property (might be handy to display an action sheet) or push another view controller. Another nifty feature is that the title of IASK buttons can be overriden by the (localizable) value from `NSUserDefaults` (or any other settings store - see below). This comes in handy for toggle buttons (e.g. Login/Logout). See the [sample application](#sample-application) for details.
 
 By default, Buttons are aligned centered except if an image is specified (default: left-aligned). The default alignment may be overridden.
 
@@ -186,7 +273,7 @@ There are 3 optional delegate methods to customize how to store and display date
 Implement this if you store the date/time in a custom format other than as `NSDate` object. Called when the user starts editing a date/time by selecting the title cell above the date/time picker.
 
     - (NSString*)settingsViewController:(IASKAppSettingsViewController*)sender datePickerTitleForSpecifier:(IASKSpecifier*)specifier;
-    
+
 Implement this to customize the displayed value in the title cell above the date/time picker.
 
     - (void)settingsViewController:(IASKAppSettingsViewController*)sender setDate:(NSDate*)date forSpecifier:(IASKSpecifier*)specifier;
@@ -217,12 +304,11 @@ Both methods are called for all your `IASKCustomViewSpecifier` entries. To diffe
 
 Optionally you can implement
 
-    - (void)settingsViewController:(IASKAppSettingsViewController*)settingsViewController
-   didSelectCustomViewSpecifier:(IASKSpecifier*)specifier;
+    - (void)settingsViewController:(IASKAppSettingsViewController*)settingsViewController didSelectCustomViewSpecifier:(IASKSpecifier*)specifier;
 
 to catch tap events for your custom view.
 
-If you specify `File`,  `IASKViewControllerClass`, `IASKViewControllerStoryBoardId`, or `IASKSegueIdentifier` (see below), the selection behavior of a custom view is identical to a child pane and the delegate is not called on selection.
+If you specify `File`, `IASKViewControllerClass`, `IASKViewControllerStoryBoardId`, or `IASKSegueIdentifier` (see below), the selection behavior of a custom view is identical to a child pane and the delegate is not called on selection.
 
 
 
@@ -230,7 +316,7 @@ If you specify `File`,  `IASKViewControllerClass`, `IASKViewControllerStoryBoard
 The FooterText key for Group elements is available in system settings. It is supported in InAppSettingsKit as well. On top of that, we support this key for Multi Value elements as well. The footer text is displayed below the table of multi value options.
 
 You can define a custom header view for `PSGroupSpecifier` segments by adding a `Key` attribute and implementing the following method in your `IASKSettingsDelegate`:
-    
+
 	- (UIView *)settingsViewController:(id<IASKViewController>)settingsViewController tableView:(UITableView *)tableView viewForHeaderForSection:(NSInteger)section;
 
 You can adjust the height of the header by implementing the following method:
@@ -255,7 +341,7 @@ For footer customization, three methods from the `IASKSettingsDelegate` protocol
 ## Extending Child Panes
 
 ### Custom ViewControllers
-For child pane elements (`PSChildPaneSpecifier`), Apple requires a `file` key that specifies the child plist. InAppSettingsKit allow to alternatively specify `IASKViewControllerClass` and `IASKViewControllerSelector`. In this case, the child pane is displayed by instantiating a UIViewController subclass of the specified class and initializing it using the init method specified in the `IASKViewControllerSelector`. The selector must have two arguments: an `NSString` argument for the file name in the Settings bundle and the `IASKSpecifier`. The custom view controller is then pushed onto the navigation stack. See the sample app for more details.
+For child pane elements (`PSChildPaneSpecifier`), Apple requires a `file` key that specifies the child plist. InAppSettingsKit allow to alternatively specify `IASKViewControllerClass` and `IASKViewControllerSelector`. In this case, the child pane is displayed by instantiating a UIViewController subclass of the specified class and initializing it using the init method specified in the `IASKViewControllerSelector`. The selector must have two arguments: an `NSString` argument for the file name in the Settings bundle and the `IASKSpecifier`. The custom view controller is then pushed onto the navigation stack. See the [sample application](#sample-application) for more details.
 
 ### Using Custom ViewControllers from StoryBoard
 Alternatively specify `IASKViewControllerStoryBoardId` to initiate a viewcontroller from [main storyboard](https://developer.apple.com/library/ios/documentation/general/conceptual/Devpedia-CocoaApp/Storyboard.html/).
@@ -285,6 +371,7 @@ To disable this behavior, add a `IASKAdjustsFontSizeToFitWidth` Boolean attribut
 
 ### Icons
 All element types (except sliders which already have a `MinimumValueImage`) support an icon image on the left side of the cell. You can specify the image name in an optional `IASKCellImage` attribute. The ".png" or "@2x.png" suffix is automatically appended and will be searched in the project. Optionally, you can add an image with suffix "Highlighted.png" or "Highlighted@2x.png" to the project and it will be automatically used as a highlight image when the cell is selected (for Buttons and ChildPanes).
+If the image is not found as a resource in the project, InAppSettingsKit falls back to SF Symbols.
 
 
 ## Extending Text Fields
@@ -308,15 +395,16 @@ The callback receives the `IASKTextField` which is a `UITextField` subclass to a
 
 
 ## Dynamic MultiValue Lists
-MultiValue lists (`PSMultiValueSpecifier`) can fetch their values and titles dynamically from the delegate instead of the static Plist. Implement these two methods in your `IASKSettingsDelegate`:
+MultiValue lists (`PSMultiValueSpecifier`) and radio groups (`PSRadioGroupSpecifier`) can fetch their values and titles dynamically from the delegate instead of the static Plist. Implement these two methods in your `IASKSettingsDelegate`:
 
     - (NSArray*)settingsViewController:(IASKAppSettingsViewController*)sender valuesForSpecifier:(IASKSpecifier*)specifier;
-    - (NSArray*)settingsViewController:(IASKAppSettingsViewController*)sender titlesForSpecifier:(IASKSpecifier*)specifier;
+    - (NSArray<NSString*>*)settingsViewController:(IASKAppSettingsViewController*)sender titlesForSpecifier:(IASKSpecifier*)specifier;
 
-The sample app returns a list of all country codes as values and the localized country names as titles.
+The [sample application](#sample-application) returns a list of all country codes as values and the localized country names as titles.
 
 MultiValue lists can be sorted alphabetically by adding a `true` Boolean `DisplaySortedByTitle` key in the Plist.
 MultiValue list entries can be given an image. Specify images via the `IconNames` attribute (next to Values/Titles/ShortTitles etc.).
+MultiValue lists support an `IASKQuickMultiValueSelection` boolean key. If set to true, the child view controller is popped on selection, so tapping the back button is not needed.
 
 
 ## Settings Storage
@@ -338,7 +426,7 @@ or the non-animated version:
 
 	@property (nonatomic, strong) NSSet *hiddenKeys;
 
-See the sample app for more details. Including a `PSGroupSpecifier` key in the `hiddenKeys` hides the complete section.
+See the [sample application](#sample-application) for more details. Including a `PSGroupSpecifier` key in the `hiddenKeys` hides the complete section.
 
 
 ## Register default values
@@ -365,6 +453,7 @@ Please don't use Github issues for support requests, we'll close them. Instead, 
 We released the code under the liberal BSD license in order to make it possible to include it in every project, be it a free or paid app. The only thing we ask for is giving the original developers some credit. The easiest way to include credits is by leaving the "Powered by InAppSettingsKit" notice in the code. If you decide to remove this notice, a noticeable mention on the App Store description page or homepage is fine, too.
 
 # Author
-Originally developed by my friend Luc Vandal, I took over the development and continue to update the framework. If you would like to support my Open Source work, consider joining me as a [sponsor](https://github.com/sponsors/futuretap)! 💪️ Your sponsorship enables me to spend more time on InAppSettingsKit and other community projects. Thank you!
+Originally developed by Luc Vandal, [Ortwin Gentz](https://www.futuretap.com/about/ortwin-gentz) ([Mastodon](https://mastodon.cloud/@ortwingentz)) took over the development and continues to update the framework. InAppSettingsKit is used in [FutureTap](https://www.futuretap.com)’s [Where To?](https://wheretoapp.com) app, so we eat our own dog food!
 
-*Ortwin Gentz*
+# Sponsors wanted
+If you would like to support my Open Source work, consider joining me as a [sponsor](https://github.com/sponsors/futuretap)! 💪️ Your sponsorship enables me to spend more time on InAppSettingsKit and other community projects. Thank you!
