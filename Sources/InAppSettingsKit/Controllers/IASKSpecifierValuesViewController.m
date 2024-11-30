@@ -55,7 +55,7 @@
 
 	if (self.currentSpecifier) {
 		self.title = self.currentSpecifier.title;
-		IASK_IF_IOS11_OR_GREATER(self.navigationItem.largeTitleDisplayMode = self.title.length ? UINavigationItemLargeTitleDisplayModeAutomatic : UINavigationItemLargeTitleDisplayModeNever;);
+		self.navigationItem.largeTitleDisplayMode = self.title.length ? UINavigationItemLargeTitleDisplayModeAutomatic : UINavigationItemLargeTitleDisplayModeNever;
 	}
 	if (self.tableView) {
 		// add a header view to fix missing spacing under large title
