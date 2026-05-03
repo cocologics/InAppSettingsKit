@@ -152,7 +152,9 @@
 		UIBarButtonItem *activityBarButtonItem = [[UIBarButtonItem alloc] initWithCustomView:self.activityIndicatorView];
 		IASK_IF_IOS26_OR_GREATER
 		(
+#if !TARGET_OS_VISION
 		 activityBarButtonItem.hidesSharedBackground = YES;
+#endif
 		 [barButtons addObject:UIBarButtonItem.fixedSpaceItem];
 		 )
 		[barButtons addObject:activityBarButtonItem];

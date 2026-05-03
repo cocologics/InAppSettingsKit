@@ -195,7 +195,7 @@ extern NSString * const IASKSettingChangedNotification;
 
 #ifdef __IPHONE_26_0
 #define IASK_IF_IOS26_OR_GREATER(...) \
-if (@available(iOS 26.0, *)) \
+if (@available(iOS 26.0, visionOS 26.0, *)) \
 { \
 __VA_ARGS__ \
 }
