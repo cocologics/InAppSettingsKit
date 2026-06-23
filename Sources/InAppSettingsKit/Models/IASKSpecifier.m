@@ -67,11 +67,8 @@
     NSArray *iconNames = [_specifierDict objectForKey:kIASKIconNames];
     NSMutableDictionary *multipleValuesDict = [NSMutableDictionary new];
    
-    if (values) {
+    if (values && titles) {
         [multipleValuesDict setObject:values forKey:kIASKValues];
-    }
-	
-    if (titles) {
         [multipleValuesDict setObject:titles forKey:kIASKTitles];
     }
 
@@ -411,31 +408,29 @@
 
 - (nullable UITextContentType)textContentType {
 	NSMutableDictionary *dict;
-	if (@available(iOS 10.0, *)) {
-		dict = @{kIASKTextContentTypeName: UITextContentTypeName,
-				 kIASKTextContentTypeNamePrefix: UITextContentTypeNamePrefix,
-				 kIASKTextContentTypeGivenName: UITextContentTypeGivenName,
-				 kIASKTextContentTypeMiddleName: UITextContentTypeMiddleName,
-				 kIASKTextContentTypeFamilyName: UITextContentTypeFamilyName,
-				 kIASKTextContentTypeNameSuffix: UITextContentTypeNameSuffix,
-				 kIASKTextContentTypeNickname: UITextContentTypeNickname,
-				 kIASKTextContentTypeJobTitle: UITextContentTypeJobTitle,
-				 kIASKTextContentTypeOrganizationName: UITextContentTypeOrganizationName,
-				 kIASKTextContentTypeLocation: UITextContentTypeLocation,
-				 kIASKTextContentTypeFullStreetAddress: UITextContentTypeFullStreetAddress,
-				 kIASKTextContentTypeStreetAddressLine1: UITextContentTypeStreetAddressLine1,
-				 kIASKTextContentTypeStreetAddressLine2: UITextContentTypeStreetAddressLine2,
-				 kIASKTextContentTypeAddressCity: UITextContentTypeAddressCity,
-				 kIASKTextContentTypeAddressState: UITextContentTypeAddressState,
-				 kIASKTextContentTypeAddressCityAndState: UITextContentTypeAddressCityAndState,
-				 kIASKTextContentTypeSublocality: UITextContentTypeSublocality,
-				 kIASKTextContentTypeCountryName: UITextContentTypeCountryName,
-				 kIASKTextContentTypePostalCode: UITextContentTypePostalCode,
-				 kIASKTextContentTypeTelephoneNumber: UITextContentTypeTelephoneNumber,
-				 kIASKTextContentTypeEmailAddress: UITextContentTypeEmailAddress,
-				 kIASKTextContentTypeURL: UITextContentTypeURL,
-				 kIASKTextContentTypeCreditCardNumber: UITextContentTypeCreditCardNumber}.mutableCopy;
-	}
+	dict = @{kIASKTextContentTypeName: UITextContentTypeName,
+			 kIASKTextContentTypeNamePrefix: UITextContentTypeNamePrefix,
+			 kIASKTextContentTypeGivenName: UITextContentTypeGivenName,
+			 kIASKTextContentTypeMiddleName: UITextContentTypeMiddleName,
+			 kIASKTextContentTypeFamilyName: UITextContentTypeFamilyName,
+			 kIASKTextContentTypeNameSuffix: UITextContentTypeNameSuffix,
+			 kIASKTextContentTypeNickname: UITextContentTypeNickname,
+			 kIASKTextContentTypeJobTitle: UITextContentTypeJobTitle,
+			 kIASKTextContentTypeOrganizationName: UITextContentTypeOrganizationName,
+			 kIASKTextContentTypeLocation: UITextContentTypeLocation,
+			 kIASKTextContentTypeFullStreetAddress: UITextContentTypeFullStreetAddress,
+			 kIASKTextContentTypeStreetAddressLine1: UITextContentTypeStreetAddressLine1,
+			 kIASKTextContentTypeStreetAddressLine2: UITextContentTypeStreetAddressLine2,
+			 kIASKTextContentTypeAddressCity: UITextContentTypeAddressCity,
+			 kIASKTextContentTypeAddressState: UITextContentTypeAddressState,
+			 kIASKTextContentTypeAddressCityAndState: UITextContentTypeAddressCityAndState,
+			 kIASKTextContentTypeSublocality: UITextContentTypeSublocality,
+			 kIASKTextContentTypeCountryName: UITextContentTypeCountryName,
+			 kIASKTextContentTypePostalCode: UITextContentTypePostalCode,
+			 kIASKTextContentTypeTelephoneNumber: UITextContentTypeTelephoneNumber,
+			 kIASKTextContentTypeEmailAddress: UITextContentTypeEmailAddress,
+			 kIASKTextContentTypeURL: UITextContentTypeURL,
+			 kIASKTextContentTypeCreditCardNumber: UITextContentTypeCreditCardNumber}.mutableCopy;
 	if (@available(iOS 11.0, *)) {
 		[dict addEntriesFromDictionary:@{kIASKTextContentTypeUsername: UITextContentTypeUsername,
 										 kIASKTextContentTypePassword: UITextContentTypePassword}];
@@ -458,7 +453,11 @@
     if( imageName.length == 0 )
         return nil;
     
-    return [UIImage imageNamed:imageName];
+	if (@available(iOS 13.0, *)) {
+		return [UIImage imageNamed:imageName] ?: [UIImage systemImageNamed:imageName];
+	} else {
+		return [UIImage imageNamed:imageName];
+	}
 }
 
 - (UIImage *)highlightedCellImage {
@@ -474,13 +473,15 @@
 	return (boxedResult == nil) || [boxedResult boolValue];
 }
 
-- (NSTextAlignment)textAlignment
-{
-    if (self.hasSubtitle || [[_specifierDict objectForKey:kIASKTextLabelAlignment] isEqualToString:kIASKTextLabelAlignmentLeft]) {
-        return NSTextAlignmentLeft;
-    } else if ([[_specifierDict objectForKey:kIASKTextLabelAlignment] isEqualToString:kIASKTextLabelAlignmentCenter]) {
+- (NSTextAlignment)textAlignment {
+	NSString *alignmentString = [_specifierDict objectForKey:kIASKTextLabelAlignment];
+    if (self.hasSubtitle || [alignmentString isEqualToString:kIASKTextLabelAlignmentNatural]) {
+        return NSTextAlignmentNatural;
+	} else if ([alignmentString isEqualToString:kIASKTextLabelAlignmentLeft]) {
+		return NSTextAlignmentLeft;
+    } else if ([alignmentString isEqualToString:kIASKTextLabelAlignmentCenter]) {
         return NSTextAlignmentCenter;
-    } else if ([[_specifierDict objectForKey:kIASKTextLabelAlignment] isEqualToString:kIASKTextLabelAlignmentRight]) {
+    } else if ([alignmentString isEqualToString:kIASKTextLabelAlignmentRight]) {
         return NSTextAlignmentRight;
     }
     if ([self.type isEqualToString:kIASKButtonSpecifier] && !self.cellImage) {
@@ -488,15 +489,39 @@
 	} else if ([@[kIASKPSMultiValueSpecifier, kIASKPSTitleValueSpecifier, kIASKTextViewSpecifier, kIASKDatePickerSpecifier] containsObject:self.type]) {
 		return NSTextAlignmentRight;
 	}
-	return NSTextAlignmentLeft;
+	return NSTextAlignmentNatural;
+}
+
+- (NSArray<IASKSpecifier*>*)multiValueChildSpecifiers {
+	NSMutableArray *result = @[self].mutableCopy;
+	if (!self.multipleValues) return result;
+	
+	if ([self.type isEqualToString:kIASKPSRadioGroupSpecifier]) {
+		for (NSString *value in self.multipleValues) {
+			IASKSpecifier *specifier =
+			[[IASKSpecifier alloc] initWithSpecifier:self.specifierDict radioGroupValue:value];
+			specifier.settingsReader = self.settingsReader;
+			specifier.multipleValuesDict = self.multipleValuesDict;
+			[specifier sortIfNeeded];
+			[result addObject:specifier];
+		}
+	}
+	return result;
+}
+
+- (BOOL)quickSelection {
+	return [[_specifierDict objectForKey:kIASKQuickMultiValueSelection] boolValue];
 }
 
 - (NSArray *)userInterfaceIdioms {
     NSMutableDictionary *idiomMap = [NSMutableDictionary dictionaryWithDictionary:
                                      @{
                                          @"Phone": @(UIUserInterfaceIdiomPhone),
-                                         @"Pad": @(UIUserInterfaceIdiomPad),
-                                     }];
+										 @"Pad": @(UIUserInterfaceIdiomPad),
+#if defined(TARGET_OS_VISION) && TARGET_OS_VISION
+										 @"Reality": @(UIUserInterfaceIdiomVision),
+#endif
+	}];
     if (@available(iOS 14.0, *)) {
         idiomMap[@"Mac"] = @(UIUserInterfaceIdiomMac);
     }
@@ -582,11 +607,9 @@
 	NSDictionary *dict = @{kIASKDatePickerStyleCompact: @(UIDatePickerStyleCompact),
 						   kIASKDatePickerStyleWheels: @(UIDatePickerStyleWheels)};
 	if (@available(iOS 14.0, *)) {
-		IASK_IF_IOS14_OR_GREATER(
-		 dict = @{kIASKDatePickerStyleCompact: @(UIDatePickerStyleCompact),
-				  kIASKDatePickerStyleWheels: @(UIDatePickerStyleWheels),
-				  kIASKDatePickerStyleInline: @(UIDatePickerStyleInline)};
-		);
+		dict = @{kIASKDatePickerStyleCompact: @(UIDatePickerStyleCompact),
+				 kIASKDatePickerStyleWheels: @(UIDatePickerStyleWheels),
+				 kIASKDatePickerStyleInline: @(UIDatePickerStyleInline)};
 	}
 	NSString *string = [_specifierDict objectForKey:kIASKDatePickerStyle];
 	NSNumber *value = dict[string];
@@ -596,10 +619,8 @@
 - (BOOL)embeddedDatePicker {
 	BOOL embeddedDatePicker = NO;
 	if (@available(iOS 14.0, *)) {
-		IASK_IF_IOS14_OR_GREATER(
-		 embeddedDatePicker = [self.type isEqualToString:kIASKDatePickerSpecifier] &&
-		 (self.datePickerStyle == UIDatePickerStyleCompact || (self.datePickerStyle == UIDatePickerStyleInline && self.datePickerMode == UIDatePickerModeTime));
-        );
+		embeddedDatePicker = [self.type isEqualToString:kIASKDatePickerSpecifier] &&
+		(self.datePickerStyle == UIDatePickerStyleCompact || (self.datePickerStyle == UIDatePickerStyleInline && self.datePickerMode == UIDatePickerModeTime));
 	}
 	return embeddedDatePicker;
 }

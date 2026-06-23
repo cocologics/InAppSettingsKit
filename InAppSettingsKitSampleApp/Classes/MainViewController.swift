@@ -37,9 +37,11 @@ class MainViewController: UIViewController {
 			let settingsVC = nc.topViewController as? IASKAppSettingsViewController
 		{
 			settingsVC.delegate = self
-			settingsVC.showDoneButton = segue.identifier == "modal"
+			settingsVC.showDoneButton = true
+			settingsVC.colorScheme = .tinted
+			nc.navigationBar.prefersLargeTitles = segue.identifier == "modal"
 			settingsViewController = settingsVC
-		} else if let settingsVC = segue.destination as? IASKAppSettingsViewController{
+		} else if let settingsVC = segue.destination as? IASKAppSettingsViewController {
 			settingsVC.delegate = self
 			settingsViewController = settingsVC
 		} else {
@@ -49,8 +51,10 @@ class MainViewController: UIViewController {
 	}
 		
 	@objc func settingDidChange(notification: Notification?) {
+		print("settingDidChange: \(notification?.userInfo.debugDescription ?? "-")")
 		updateHiddenKeys()
 	}
+	
 	func updateHiddenKeys() {
 		var hiddenKeys = Set<String>()
 		if UserDefaults.standard.bool(forKey: "AutoConnect") {
@@ -74,9 +78,12 @@ extension MainViewController: IASKSettingsDelegate {
 								textField: IASKTextField,
 								previousValue: String?,
 								replacement: AutoreleasingUnsafeMutablePointer<NSString>?) -> IASKValidationResult {
-		guard let key = specifier.key else { return .ok }
+		guard let key = specifier.key,
+			  let newText = replacement?.pointee else {
+			return .ok
+		}
 		if key.starts(with: "RegexValidation") {
-			if textField.text == "" || textField.text?.range(of: #".+\@.+"#, options: .regularExpression) != nil {
+			if newText == "" || newText.range(of: #".+\@.+"#, options: .regularExpression).location != NSNotFound {
 				if #available(iOS 13.0, *) {
 					textField.textColor = .label
 				} else {
@@ -85,12 +92,28 @@ extension MainViewController: IASKSettingsDelegate {
 				return .ok
 			}
 			if key != "RegexValidation2" {
-				let myReplacement: String = ((previousValue?.lengthOfBytes(using: .utf8) ?? 0) > 0 ? previousValue : textField.text) ?? ""
+				let myReplacement: String = (previousValue?.lengthOfBytes(using: .utf8) ?? 0) > 0 ? previousValue ?? "" : newText as String
 				replacement?.pointee = myReplacement as NSString
 				return .failedWithShake
 			}
 			textField.textColor = .red
 			return .failed
+		} else if key == "account_name" {
+			let regex = "^@?[\\w](?!.*?\\.{2})[\\w.]{1,28}[\\w]$"
+			if newText == "" {
+				return .ok
+			} else if newText == "@" {
+				replacement?.pointee = "" as NSString
+				return .failed
+			} else if newText.range(of: regex, options: .regularExpression).location == NSNotFound {
+				if let previousValue {
+					replacement?.pointee = previousValue as NSString
+					return .failedWithShake
+				}
+			} else if !newText.hasPrefix("@") {
+				replacement?.pointee = "@\(newText)" as NSString
+				return .okWithReplacement
+			}
 		}
 		return .ok
 	}
@@ -193,14 +216,14 @@ extension MainViewController: IASKSettingsDelegate {
 	}
 	
 	func settingsViewController(_ settingsViewController: IASKAppSettingsViewController, valuesFor specifier: IASKSpecifier) -> [Any] {
-		return specifier.key == "countryCode" ? Locale.isoRegionCodes : []
+		return specifier.key == "countryCode" ? Locale.isoRegionCodes : ["Chicago", "Seattle", "Miami"]
 	}
 	
-	func settingsViewController(_ settingsViewController: IASKAppSettingsViewController, titlesFor specifier: IASKSpecifier) -> [Any] {
+	func settingsViewController(_ settingsViewController: IASKAppSettingsViewController, titlesFor specifier: IASKSpecifier) -> [String] {
 		if specifier.key == "countryCode" {
 			return Locale.isoRegionCodes.map{Locale.current.localizedString(forRegionCode: $0) ?? ""}
 		}
-		return []
+		return ["Chicago", "Seattle", "Miami"]
 	}
 	
 	func settingsViewController(_ settingsViewController: IASKAppSettingsViewController, childPaneIsValidFor specifier: IASKSpecifier, contentDictionary: NSMutableDictionary) -> Bool {

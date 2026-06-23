@@ -118,9 +118,11 @@ NS_ASSUME_NONNULL_BEGIN
 #define kIASKTextLabelAlignmentLeft           @"IASKUITextAlignmentLeft"
 #define kIASKTextLabelAlignmentCenter         @"IASKUITextAlignmentCenter"
 #define kIASKTextLabelAlignmentRight          @"IASKUITextAlignmentRight"
+#define kIASKTextLabelAlignmentNatural        @"IASKUITextAlignmentNatural"
 #define kIASKToggleStyle                      @"IASKToggleStyle"
 #define kIASKToggleStyleCheckmark             @"Checkmark"
 #define kIASKToggleStyleSwitch                @"Switch"
+#define kIASKQuickMultiValueSelection         @"IASKQuickMultiValueSelection"
 
 #define kIASKPSGroupSpecifier                 @"PSGroupSpecifier"
 #define kIASKListGroupSpecifier	              @"IASKListGroupSpecifier"
@@ -145,8 +147,33 @@ NS_ASSUME_NONNULL_BEGIN
 // the HTML title as soon as the page is loaded. The value of IASKChildTitle is localizable.
 #define kIASKChildTitle                       @"IASKChildTitle"
 
+/*
+ IASKWebViewShowProgress can be set if IASKViewControllerClass is set to IASKAppSettingsWebViewController.
+ If IASKWebViewShowProgress is set, it will replace the default activity indicator on the Navigation Bar by a progress bar just below the Navigation Bar, which dynamically updates according to the `estimatedProgress` property of WKWebView.
+ */
+#define kIASKWebViewShowProgress              @"IASKWebViewShowProgress"
+
+/*
+ IASKWebViewFullscreen can be set if IASKViewControllerClass is set to IASKAppSettingsWebViewController.
+ If IASKWebViewFullscreen is set, it will present the WKWebView full screen, with content extending below the navigation bar.
+ */
+#define kIASKWebViewFullscreen                @"IASKWebViewFullscreen"
+
+/*
+ IASKWebViewHideBottomBar can be set if IASKViewControllerClass is set to IASKAppSettingsWebViewController.
+ If IASKWebViewHideBottomBar is set, it will hide the toolbar at the bottom of the screen when the IASKAppSettingsWebViewController is pushed on to a navigation controller. This will present the WKWebView full screen and prevents situations where the user can navigate the tab bar while the IASKAppSettingsWebViewController stays still present.
+ */
+#define kIASKWebViewHideBottomBar             @"IASKWebViewHideBottomBar"
+
+/*
+ IASKWebViewShowNavigationalButtons can be set if IASKViewControllerClass is set to IASKAppSettingsWebViewController.
+ If IASKWebViewShowNavigationalButtons is set, it will show navigational buttons on the right side of the Navigation Bar. Their enable state will update dynamically based on the navigation history of the WKWebView.
+ */
+#define kIASKWebViewShowNavigationalButtons   @"IASKWebViewShowNavigationalButtons"
+
 extern NSString * const IASKSettingChangedNotification;
 #define kIASKAppSettingChanged                IASKSettingChangedNotification
+#define kIASKInternalAppSettingChanged        @"IASKInternalSettingChangedNotification"
 
 #define kIASKSectionHeaderIndex               0
 
@@ -156,11 +183,7 @@ extern NSString * const IASKSettingChangedNotification;
 #define kIASKMinLabelWidth                    97
 #define kIASKMaxLabelWidth                    240
 #define kIASKMinValueWidth                    35
-#if __IPHONE_OS_VERSION_MAX_ALLOWED >= 70000
-#define kIASKPaddingLeft                      (floor(NSFoundationVersionNumber) > NSFoundationVersionNumber_iOS_6_1 ? 15 : 9)
-#else
-#define kIASKPaddingLeft                      9
-#endif
+#define kIASKPaddingLeft                      15
 #define kIASKPaddingRight                     10
 #define kIASKHorizontalPaddingGroupTitles     19
 #define kIASKVerticalPaddingGroupTitles       15
@@ -170,54 +193,23 @@ extern NSString * const IASKSettingChangedNotification;
 
 #define kIASKMinimumFontSize                  12.0f
 
-#ifndef kCFCoreFoundationVersionNumber_iOS_7_0
-#define kCFCoreFoundationVersionNumber_iOS_7_0 843.00
-#endif
-
-#ifndef kCFCoreFoundationVersionNumber_iOS_8_0
-#define kCFCoreFoundationVersionNumber_iOS_8_0 1129.150000
-#endif
-
-#ifndef kCFCoreFoundationVersionNumber_iOS_11_0
-#define kCFCoreFoundationVersionNumber_iOS_11_0 1429.150000
-#endif
-
-#ifndef kCFCoreFoundationVersionNumber_iOS_14_0
-#define kCFCoreFoundationVersionNumber_iOS_14_0 1740.0
-#endif
-
-#ifdef __IPHONE_11_0
-#define IASK_IF_IOS11_OR_GREATER(...) \
-if (@available(iOS 11.0, *)) \
-{ \
-__VA_ARGS__ \
-}
-
-#define IASK_IF_PRE_IOS11(...) \
-_Pragma("clang diagnostic push") \
-_Pragma("clang diagnostic ignored \"-Wdeprecated-declarations\"") \
-if (kCFCoreFoundationVersionNumber < kCFCoreFoundationVersionNumber_iOS_11_0) \
-{ \
-__VA_ARGS__ \
-} \
-_Pragma("clang diagnostic pop")
-#else
-#define IASK_IF_IOS11_OR_GREATER(...)
-#define IASK_IF_PRE_IOS11(...)
-#endif
-
-#ifdef __IPHONE_14_0
-#define IASK_IF_IOS14_OR_GREATER(...) \
-if (kCFCoreFoundationVersionNumber >= kCFCoreFoundationVersionNumber_iOS_14_0) \
+#ifdef __IPHONE_26_0
+#define IASK_IF_IOS26_OR_GREATER(...) \
+if (@available(iOS 26.0, visionOS 26.0, *)) \
 { \
 __VA_ARGS__ \
 }
 #else
-#define IASK_IF_IOS14_OR_GREATER(...)
+#define IASK_IF_IOS26_OR_GREATER(...)
 #endif
 
 @class IASKSpecifier;
 @protocol IASKSettingsStore;
+
+@protocol IASKSettingsReaderDelegate <NSObject>
+- (nullable NSArray<NSString*>*)titlesForSpecifier:(IASKSpecifier*)specifier;
+- (nullable NSArray*)valuesForSpecifier:(IASKSpecifier*)specifier;
+@end
 
 /** settings reader transform iOS's settings plist files
  to the IASKSpecifier model objects.
@@ -232,7 +224,7 @@ __VA_ARGS__ \
  @param file   settings file name without the ".plist" suffix
  @param bundle bundle that contains a plist with the specified file
   */
-- (id)initWithFile:(NSString*)file bundle:(NSBundle*)bundle;
+- (id)initWithFile:(NSString*)file bundle:(NSBundle*)bundle delegate:(nullable id<IASKSettingsReaderDelegate>)delegate;
 
 /** convenience initializer
  calls initWithFile where applicationBundle is set to NSBundle.mainBundle
@@ -241,6 +233,7 @@ __VA_ARGS__ \
 - (id)initWithFile:(NSString*)file;
 
 @property (nonatomic, readonly) NSInteger numberOfSections;
+@property (nonatomic, nullable, weak) id<IASKSettingsReaderDelegate> delegate;
 - (NSInteger)numberOfRowsInSection:(NSInteger)section;
 - (nullable IASKSpecifier*)specifierForIndexPath:(NSIndexPath*)indexPath;
 - (nullable IASKSpecifier*)headerSpecifierForSection:(NSInteger)section;
