@@ -162,9 +162,9 @@ shouldPresentMailComposeViewController:(MFMailComposeViewController*)mailCompose
  @param specifier the specifier containing the key of the selected element
  @return an array of titles
  @discussion the returned array overrides any titles specified in the static schema plist
-*/
-- (NSArray*)settingsViewController:(IASKAppSettingsViewController*)settingsViewController
-				titlesForSpecifier:(IASKSpecifier*)specifier;
+ */
+- (NSArray<NSString*>*)settingsViewController:(IASKAppSettingsViewController*)settingsViewController
+						   titlesForSpecifier:(IASKSpecifier*)specifier;
 
 #pragma mark - Button
 /** Tells the delegate that the specified button (`IASKButton`) element is now selected.
@@ -176,8 +176,16 @@ shouldPresentMailComposeViewController:(MFMailComposeViewController*)mailCompose
 
 #pragma mark - Validation
 typedef NS_ENUM(NSUInteger, IASKValidationResult) {
+	/** validation is OK, no replacement is performed. */
 	IASKValidationResultOk,
+	
+	/** validation is OK with the replacement performed. */
+	IASKValidationResultOkWithReplacement,
+	
+	/** validation has failed, the replacement is performed. */
 	IASKValidationResultFailed,
+	
+	/** validation has failed, the replacement is performed, and the field shakes to indicate the error. */
 	IASKValidationResultFailedWithShake,
 };
 /** validate user input in text fields
@@ -233,7 +241,7 @@ shouldSetMultiValueForSpecifier:(IASKSpecifier*)specifier
 @interface IASKAppSettingsViewController : UITableViewController <IASKViewController, UITextFieldDelegate, MFMailComposeViewControllerDelegate>
 
 /// the delegate to customize IASK’s behavior. Propagated to child view controllers.
-@property (nonatomic, assign) IBOutlet id<IASKSettingsDelegate> delegate;
+@property (nonatomic, weak) IBOutlet id<IASKSettingsDelegate> delegate;
 
 /** base name of the settings plist file (default: `Root`)
  @discussion IASK automatically checks for specific or custom inApp plists according to this order (`DEVICE` being a placeholder for "iphone" on iPhone and "ipad" on iPad):
@@ -262,6 +270,9 @@ shouldSetMultiValueForSpecifier:(IASKSpecifier*)specifier
 
 /// Sets the same parameter on the tableView of the root and all child view controllers
 @property (nonatomic) IBInspectable BOOL cellLayoutMarginsFollowReadableWidth;
+
+/// The bundle to read the settings plist files from. Defaults to `NSBundle.mainBundle`.
+@property (nonatomic) NSBundle* bundle;
 
 /// Synchronizes the settings store, e.g. calls `-[NSUserDefaults synchronize]` in case of the default store.
 - (void)synchronizeSettings;

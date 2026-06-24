@@ -34,6 +34,7 @@
 @synthesize settingsStore = _settingsStore;
 @synthesize childPaneHandler = _childPaneHandler;
 @synthesize listParentViewController;
+@synthesize colorScheme = _colorScheme;
 
 - (id)initWithSpecifier:(IASKSpecifier*)specifier {
 	if ((self = [super initWithStyle:UITableViewStyleGrouped])) {
@@ -54,7 +55,13 @@
 
 	if (self.currentSpecifier) {
 		self.title = self.currentSpecifier.title;
-		IASK_IF_IOS11_OR_GREATER(self.navigationItem.largeTitleDisplayMode = self.title.length ? UINavigationItemLargeTitleDisplayModeAutomatic : UINavigationItemLargeTitleDisplayModeNever;);
+#if defined(TARGET_OS_VISION) && TARGET_OS_VISION
+		self.navigationItem.largeTitleDisplayMode = self.title.length ? UINavigationItemLargeTitleDisplayModeAutomatic : UINavigationItemLargeTitleDisplayModeNever;
+#else
+		if (@available(iOS 11.0, *)) {
+			self.navigationItem.largeTitleDisplayMode = self.title.length ? UINavigationItemLargeTitleDisplayModeAutomatic : UINavigationItemLargeTitleDisplayModeNever;
+		}
+#endif
 	}
 	if (self.tableView) {
 		// add a header view to fix missing spacing under large title
@@ -68,7 +75,7 @@
 
 - (void)viewWillAppear:(BOOL)animated {
 	[super viewWillAppear:animated];
-    
+
     if (self.tableView) {
 		self.selection.tableView = self.tableView;
 		[self.tableView reloadData];
@@ -132,8 +139,11 @@
             // This tries to read the image from the main bundle. As this is currently not supported in
             // system settings, this should be the correct behaviour. (Idea: abstract away and try different
             // paths?)
-            UIImage *image = [UIImage imageNamed:iconName];
-            cell.imageView.image = image;
+			if (@available(iOS 13.0, *)) {
+				cell.imageView.image = [UIImage imageNamed:iconName] ?: [UIImage systemImageNamed:iconName];
+			} else {
+				cell.imageView.image = [UIImage imageNamed:iconName];
+			}
         }
     }
     @catch (NSException * e) {}
@@ -154,7 +164,11 @@
 		[tableView deselectRowAtIndexPath:indexPath animated:YES];
 		return;
 	}
-	[_selection selectRowAtIndexPath:indexPath];
+	[self.selection selectRowAtIndexPath:indexPath];
+
+	if (self.currentSpecifier.quickSelection) {
+		[self.navigationController popViewControllerAnimated:YES];
+	}
 }
 
 @end
