@@ -143,6 +143,18 @@ CGRect IASKCGRectSwap(CGRect rect);
 	_selections = sectionSelection;
 }
 
+/// Bounds-checked access to the per-section selection array. Returns nil for an
+/// out-of-range section or a non-radio-group section, so callers degrade to a no-op
+/// instead of raising NSRangeException if _selections is momentarily out of sync
+/// with the table view's section count.
+- (IASKMultipleValueSelection *)selectionForSection:(NSInteger)section {
+	if (section < 0 || section >= (NSInteger)_selections.count) {
+		return nil;
+	}
+	id selection = _selections[section];
+	return [selection isKindOfClass:IASKMultipleValueSelection.class] ? selection : nil;
+}
+
 #pragma mark standard view controller methods
 - (id)init {
     return [self initWithStyle:UITableViewStyleGrouped];
@@ -334,6 +346,12 @@ CGRect IASKCGRectSwap(CGRect rect);
 			
             // set the datasource
             self.settingsReader.hiddenKeys = theHiddenKeys;
+
+            // The section count can change here (sections get inserted/deleted below), and
+            // _selections is a parallel array indexed by section. Rebuild it now, before the
+            // table view starts asking for cells during endUpdates — otherwise a radio group
+            // in a newly inserted section indexes past the end of the stale array.
+            [self createSelections];
             
             
             // calculate rows to be inserted
@@ -803,7 +821,7 @@ CGRect IASKCGRectSwap(CGRect rect);
 	} else if ([specifier.type isEqualToString:kIASKPSRadioGroupSpecifier]) {
 		NSInteger index = [specifier.multipleValues indexOfObject:(id)specifier.radioGroupValue];
 		cell.textLabel.text = [self.settingsReader titleForId:specifier.multipleTitles[index]];
-		[_selections[indexPath.section] updateSelectionInCell:cell indexPath:indexPath];
+		[[self selectionForSection:indexPath.section] updateSelectionInCell:cell indexPath:indexPath];
 	} else if ([specifier.type isEqualToString:kIASKDatePickerControl]) {
 		IASKDatePickerViewCell *datePickerCell = (id)cell;
 		datePickerCell.datePicker.specifier = specifier;
@@ -1051,7 +1069,7 @@ CGRect IASKCGRectSwap(CGRect rect);
     } else if ([specifier.type isEqualToString:kIASKCustomViewSpecifier] && [self.delegate respondsToSelector:@selector(settingsViewController:didSelectCustomViewSpecifier:)]) {
         [self.delegate settingsViewController:self didSelectCustomViewSpecifier:specifier];
 	} else if ([specifier.type isEqualToString:kIASKPSRadioGroupSpecifier]) {
-		[_selections[indexPath.section] selectRowAtIndexPath:indexPath];
+		[[self selectionForSection:indexPath.section] selectRowAtIndexPath:indexPath];
 	} else if ([specifier.type isEqualToString:kIASKDatePickerSpecifier]) {
 		if (![selectedSpecifier isEqual:specifier]) {
 			self.settingsReader.selectedSpecifier = specifier;
